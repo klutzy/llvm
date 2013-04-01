@@ -189,6 +189,10 @@ namespace llvm {
     /// via the llvm.fma.* intrinsic) will always be honored, regardless of
     /// the value of this option.
     FPOpFusion::FPOpFusionMode AllowFPOpFusion;
+
+    /// The size of the stack segment to use for functions with fixed-size
+    /// stack segments, in bytes.
+    unsigned FixedStackSegmentSize;
   };
 
 // Comparison operators:

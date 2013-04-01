@@ -128,6 +128,11 @@ static bool InlineCallIfPossible(CallSite CS, InlineFunctionInfo &IFI,
 
   AdjustCallerSSPLevel(Caller, Callee);
 
+  // If the inlined function has a fixed stack segment, then make the caller
+  // have a fixed stack segment as well.
+  if (Callee->hasFnAttribute("fixed-stack-segment"))
+    Caller->addFnAttr("fixed-stack-segment");
+
   // Look at all of the allocas that we inlined through this call site.  If we
   // have already inlined other allocas through other calls into this function,
   // then we know that they have disjoint lifetimes and that we can merge them.

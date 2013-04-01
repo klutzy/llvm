@@ -1135,14 +1135,14 @@ AttrBuilder &AttrBuilder::addRawValue(uint64_t Val) {
        I = Attribute::AttrKind(I + 1)) {
     if (uint64_t A = (Val & AttributeImpl::getAttrMask(I))) {
       Attrs[I] = true;
- 
+
       if (I == Attribute::Alignment)
         Alignment = 1ULL << ((A >> 16) - 1);
       else if (I == Attribute::StackAlignment)
         StackAlignment = 1ULL << ((A >> 26)-1);
     }
   }
- 
+
   return *this;
 }
 

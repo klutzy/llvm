@@ -1457,6 +1457,11 @@ X86FrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
   // prologue.
   StackSize = MFI->getStackSize();
 
+  // If the front-end requested a fixed stack segment size, use that.
+  if (MF.getFunction()->hasFnAttribute("fixed-stack-segment")) {
+    StackSize = MF.getTarget().Options.FixedStackSegmentSize;
+  }
+
   // When the frame size is less than 256 we just compare the stack
   // boundary directly to the value of the stack pointer, per gcc.
   bool CompareStackPointer = StackSize < kSplitStackAvailable;
