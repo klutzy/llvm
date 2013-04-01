@@ -213,6 +213,8 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
     return "sanitize_thread";
   if (hasAttribute(Attribute::SanitizeMemory))
     return "sanitize_memory";
+  if (hasAttribute(Attribute::FixedStackSegment))
+    return "fixedstacksegment";
   if (hasAttribute(Attribute::UWTable))
     return "uwtable";
   if (hasAttribute(Attribute::ZExt))
@@ -396,6 +398,7 @@ uint64_t AttributeImpl::getAttrMask(Attribute::AttrKind Val) {
   case Attribute::SanitizeMemory:  return 1ULL << 37;
   case Attribute::NoBuiltin:       return 1ULL << 38;
   case Attribute::Returned:        return 1ULL << 39;
+  case Attribute::FixedStackSegment:  return 1ULL << 41;
   }
   llvm_unreachable("Unsupported attribute type");
 }
@@ -1121,14 +1124,14 @@ AttrBuilder &AttrBuilder::addRawValue(uint64_t Val) {
        I = Attribute::AttrKind(I + 1)) {
     if (uint64_t A = (Val & AttributeImpl::getAttrMask(I))) {
       Attrs[I] = true;
- 
+
       if (I == Attribute::Alignment)
         Alignment = 1ULL << ((A >> 16) - 1);
       else if (I == Attribute::StackAlignment)
         StackAlignment = 1ULL << ((A >> 26)-1);
     }
   }
- 
+
   return *this;
 }
 

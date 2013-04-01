@@ -68,6 +68,7 @@ public:
                            ///< 0 means unaligned (different from align(1))
     AlwaysInline,          ///< inline=always
     ByVal,                 ///< Pass structure by value
+    FixedStackSegment,     ///< Fixed-size stack segment
     InlineHint,            ///< Source said inlining was desirable
     InReg,                 ///< Force argument to be passed in register
     MinSize,               ///< Function must be optimized for size first
@@ -256,13 +257,13 @@ public:
   /// \brief Remove the specified attribute at the specified index from this
   /// attribute list. Since attribute lists are immutable, this returns the new
   /// list.
-  AttributeSet removeAttribute(LLVMContext &C, unsigned Index, 
+  AttributeSet removeAttribute(LLVMContext &C, unsigned Index,
                                Attribute::AttrKind Attr) const;
 
   /// \brief Remove the specified attributes at the specified index from this
   /// attribute list. Since attribute lists are immutable, this returns the new
   /// list.
-  AttributeSet removeAttributes(LLVMContext &C, unsigned Index, 
+  AttributeSet removeAttributes(LLVMContext &C, unsigned Index,
                                 AttributeSet Attrs) const;
 
   //===--------------------------------------------------------------------===//

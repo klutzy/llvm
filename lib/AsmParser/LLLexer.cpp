@@ -594,6 +594,7 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(sanitize_memory);
   KEYWORD(uwtable);
   KEYWORD(zeroext);
+  KEYWORD(fixedstacksegment);
 
   KEYWORD(type);
   KEYWORD(opaque);
