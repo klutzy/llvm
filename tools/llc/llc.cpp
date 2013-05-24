@@ -279,6 +279,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
   Options.PositionIndependentExecutable = EnablePIE;
   Options.EnableSegmentedStacks = SegmentedStacks;
   Options.UseInitArray = UseInitArray;
+  Options.FixedStackSegmentSize = FixedStackSegmentSize;
 
   OwningPtr<TargetMachine>
     target(TheTarget->createTargetMachine(TheTriple.getTriple(),

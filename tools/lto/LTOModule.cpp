@@ -141,6 +141,11 @@ UseInitArray("use-init-array",
   cl::desc("Use .init_array instead of .ctors."),
   cl::init(false));
 
+static cl::opt<unsigned>
+FixedStackSegmentSize("fixed-stack-segment-size",
+  cl::desc("Size of the stack segment for fixed-size stack segments"),
+  cl::init(2*1024*1024));
+
 LTOModule::LTOModule(llvm::Module *m, llvm::TargetMachine *t)
   : _module(m), _target(t),
     _context(_target->getMCAsmInfo(), _target->getRegisterInfo(), NULL),
@@ -243,6 +248,7 @@ void LTOModule::getTargetOptions(TargetOptions &Options) {
   Options.PositionIndependentExecutable = EnablePIE;
   Options.EnableSegmentedStacks = SegmentedStacks;
   Options.UseInitArray = UseInitArray;
+  Options.FixedStackSegmentSize = FixedStackSegmentSize;
 }
 
 LTOModule *LTOModule::makeLTOModule(MemoryBuffer *buffer,

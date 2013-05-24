@@ -210,4 +210,9 @@ cl::opt<std::string> StartAfter("start-after",
                           cl::value_desc("pass-name"),
                           cl::init(""));
 
+cl::opt<unsigned>
+FixedStackSegmentSize("fixed-stack-segment-size",
+                cl::desc("Size of the stack segment for fixed-size"
+                         " stack segments"),
+                cl::init(2*1024*1024));
 #endif

@@ -406,7 +406,7 @@ struct BreakpointPrinter : public ModulePass {
     AU.setPreservesAll();
   }
 };
- 
+
 } // anonymous namespace
 
 char BreakpointPrinter::ID = 0;
@@ -448,7 +448,7 @@ static void AddOptimizationPasses(PassManagerBase &MPM,FunctionPassManager &FPM,
   }
   Builder.DisableUnitAtATime = !UnitAtATime;
   Builder.DisableUnrollLoops = OptLevel == 0;
-  
+
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(MPM);
 
@@ -510,6 +510,7 @@ static TargetOptions GetTargetOptions() {
   Options.PositionIndependentExecutable = EnablePIE;
   Options.EnableSegmentedStacks = SegmentedStacks;
   Options.UseInitArray = UseInitArray;
+  Options.FixedStackSegmentSize = FixedStackSegmentSize;
   return Options;
 }
 
