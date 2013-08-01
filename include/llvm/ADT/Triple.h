@@ -328,6 +328,11 @@ public:
     return getOS() == Triple::NaCl;
   }
 
+  /// \brief Tests whether the OS is Linux
+  bool isOSLinux() const {
+    return getOS() == Triple::Linux;
+  }
+
   /// \brief Tests whether the OS uses the ELF binary format.
   bool isOSBinFormatELF() const {
     return !isOSDarwin() && !isOSWindows();

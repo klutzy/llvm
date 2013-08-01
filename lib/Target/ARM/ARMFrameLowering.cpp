@@ -1432,7 +1432,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
   MBB.erase(I);
 }
 
-// Get minimum constant for ARM instruction set that is greator than 
+// Get minimum constant for ARM instruction set that is greator than
 // or equal to the argument.
 // In ARM instruction, constant can have any value that can be
 // produced by rotating an 8-bit value right by and even number
@@ -1456,29 +1456,28 @@ static uint32_t AlignToARMConstant(uint32_t Value) {
 
   if (Shifted > 24)
       Value = Value >> (Shifted - 24);
-  else 
+  else
       Value = Value << (24 - Shifted);
 
   return Value;
 }
 
-// The stack limit in the TCB is set to this manyu bytes above the actual 
+// The stack limit in the TCB is set to this manyu bytes above the actual
 // stack limit.
 static const uint64_t kSplitStackAvailable = 256;
 
 // Adjust function prologue to enable split stack.
-// Only support android.
-void 
+// Only support android and linux.
+void
 ARMFrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
   const ARMSubtarget *ST = &MF.getTarget().getSubtarget<ARMSubtarget>();
 
   // Doesn't support vararg function.
   if (MF.getFunction()->isVarArg())
     report_fatal_error("Segmented stacks do not support vararg functions.");
-  // Doesn't support other than android.
-  if (!ST->isTargetAndroid())
-    report_fatal_error("Segmented statks not supported on this platfrom.");
-  
+  if (!ST->isTargetAndroid() && !ST->isTargetLinux())
+    report_fatal_error("Segmented stacks not supported on this platfrom.");
+
   MachineBasicBlock &prologueMBB = MF.front();
   MachineFrameInfo* MFI = MF.getFrameInfo();
   const ARMBaseInstrInfo &TII = *TM.getInstrInfo();
@@ -1490,37 +1489,50 @@ ARMFrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
   // leave the function.
   unsigned ScratchReg0 = ARM::R4;
   unsigned ScratchReg1 = ARM::R5;
-  // Use the last tls slot.
-  unsigned TlsOffset = 63;
+  unsigned TlsOffset;
   uint64_t AlignedStackSize;
+
+  if (ST->isTargetAndroid()) {
+    // Use the last tls slot.
+    TlsOffset = 63;
+  } else if (ST->isTargetLinux()) {
+    // Use private field of the TCB
+    TlsOffset = 1;
+  }
 
   MachineBasicBlock* prevStackMBB = MF.CreateMachineBasicBlock();
   MachineBasicBlock* postStackMBB = MF.CreateMachineBasicBlock();
   MachineBasicBlock* allocMBB = MF.CreateMachineBasicBlock();
-  MachineBasicBlock* checkMBB = MF.CreateMachineBasicBlock();
+  MachineBasicBlock* getMBB = MF.CreateMachineBasicBlock();
+  MachineBasicBlock* mcrMBB = MF.CreateMachineBasicBlock();
+  MachineBasicBlock* magicMBB = MF.CreateMachineBasicBlock();
 
   for (MachineBasicBlock::livein_iterator i = prologueMBB.livein_begin(),
          e = prologueMBB.livein_end(); i != e; ++i) {
     allocMBB->addLiveIn(*i);
-    checkMBB->addLiveIn(*i);
+    getMBB->addLiveIn(*i);
+    magicMBB->addLiveIn(*i);
+    mcrMBB->addLiveIn(*i);
     prevStackMBB->addLiveIn(*i);
     postStackMBB->addLiveIn(*i);
   }
 
   MF.push_front(postStackMBB);
   MF.push_front(allocMBB);
-  MF.push_front(checkMBB);
+  MF.push_front(getMBB);
+  MF.push_front(magicMBB);
+  MF.push_front(mcrMBB);
   MF.push_front(prevStackMBB);
 
   // The required stack size that is aligend to ARM constant critarion.
   uint64_t StackSize = MFI->getStackSize();
 
   // If the front-end requested a fixed stack segment size, use that.
-  if (MF.getFunction()->hasFnAttribute("fixedstacksegment")) {
+  if (MF.getFunction()->hasFnAttribute("fixed-stack-segment")) {
     StackSize = MF.getTarget().Options.FixedStackSegmentSize;
   }
 
-  AlignedStackSize = AlignToARMConstant(StackSize)
+  AlignedStackSize = AlignToARMConstant(StackSize);
 
   // When the frame size is less than 256 we just compare the stack
   // boundary directly to the value of the stack pointer, per gcc.
@@ -1541,41 +1553,63 @@ ARMFrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
 
   if (CompareStackPointer) {
     // mov SR1, sp
-    AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::MOVr), ScratchReg1)
+    AddDefaultPred(BuildMI(mcrMBB, DL, TII.get(ARM::MOVr), ScratchReg1)
                    .addReg(ARM::SP)).addReg(0);
   } else {
     // sub SR1, sp, #StackSize
-    AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::SUBri), ScratchReg1)
+    AddDefaultPred(BuildMI(mcrMBB, DL, TII.get(ARM::SUBri), ScratchReg1)
                    .addReg(ARM::SP).addImm(AlignedStackSize)).addReg(0);
   }
- 
+
   // Get TLS base address.
+  // First try to get it from the coprocessor
   // mrc p15, #0, SR0, c13, c0, #3
-  AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::MRC), ScratchReg0)
+  AddDefaultPred(BuildMI(mcrMBB, DL, TII.get(ARM::MRC), ScratchReg0)
                  .addImm(15)
                  .addImm(0)
                  .addImm(13)
                  .addImm(0)
                  .addImm(3));
 
-  // The last slot, assume that the last tls slot holds the stack limit
-  // add SR0, SR0, #252
-  AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::ADDri), ScratchReg0)
+  // Success?
+  // cmp SR0, #0
+  AddDefaultPred(BuildMI(mcrMBB, DL, TII.get(ARM::CMPri))
+                 .addReg(ScratchReg0)
+                 .addImm(0));
+
+  // This jump is taken if SR0 is not null
+  BuildMI(mcrMBB, DL, TII.get(ARM::Bcc)).addMBB(getMBB)
+    .addImm(ARMCC::NE)
+    .addReg(ARM::CPSR);
+
+  // Next, try to get it from the special address 0xFFFF0FF0
+  // mvn SR0, #0xF000
+  AddDefaultPred(BuildMI(magicMBB, DL, TII.get(ARM::MVNi), ScratchReg0)
+                 .addImm(0xF000)).addReg(0);
+  // ldr SR0, [SR0, #-15]
+  AddDefaultPred(BuildMI(magicMBB, DL, TII.get(ARM::LDRi12), ScratchReg0)
+                 .addReg(ScratchReg0)
+                 .addImm(-15));
+
+
+  // Get the stack limit from the right offset
+  // add SR0, SR0, offset*4
+  AddDefaultPred(BuildMI(getMBB, DL, TII.get(ARM::ADDri), ScratchReg0)
                  .addReg(ScratchReg0).addImm(4*TlsOffset)).addReg(0);
 
   // Get stack limit.
   // ldr SR0, [sr0]
-  AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::LDRi12), ScratchReg0)
+  AddDefaultPred(BuildMI(getMBB, DL, TII.get(ARM::LDRi12), ScratchReg0)
                  .addReg(ScratchReg0).addImm(0));
 
   // Compare stack limit with stack size requested.
   // cmp SR0, SR1
-  AddDefaultPred(BuildMI(checkMBB, DL, TII.get(ARM::CMPrr))
+  AddDefaultPred(BuildMI(getMBB, DL, TII.get(ARM::CMPrr))
                  .addReg(ScratchReg0)
                  .addReg(ScratchReg1));
 
   // This jump is taken if StackLimit < SP - stack required.
-  BuildMI(checkMBB, DL, TII.get(ARM::Bcc)).addMBB(postStackMBB)
+  BuildMI(getMBB, DL, TII.get(ARM::Bcc)).addMBB(postStackMBB)
     .addImm(ARMCC::LO)
     .addReg(ARM::CPSR);
 
@@ -1603,7 +1637,7 @@ ARMFrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
   // Call __morestack().
   BuildMI(allocMBB, DL, TII.get(ARM::BL))
     .addExternalSymbol("__morestack");
-  
+
   // Restore return address of this original function.
   // pop {lr}
   AddDefaultPred(BuildMI(allocMBB, DL, TII.get(ARM::LDMIA_UPD))
@@ -1638,11 +1672,16 @@ ARMFrameLowering::adjustForSegmentedStacks(MachineFunction &MF) const {
   postStackMBB->addSuccessor(&prologueMBB);
 
   allocMBB->addSuccessor(postStackMBB);
-  
-  checkMBB->addSuccessor(postStackMBB);
-  checkMBB->addSuccessor(allocMBB);
-  
-  prevStackMBB->addSuccessor(checkMBB);
+
+  getMBB->addSuccessor(postStackMBB);
+  getMBB->addSuccessor(allocMBB);
+
+  magicMBB->addSuccessor(getMBB);
+
+  mcrMBB->addSuccessor(getMBB);
+  mcrMBB->addSuccessor(magicMBB);
+
+  prevStackMBB->addSuccessor(mcrMBB);
 
 #ifdef XDEBUG
   MF.verify();
