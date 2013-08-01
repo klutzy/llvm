@@ -270,6 +270,7 @@ public:
 
   bool isTargetIOS() const { return TargetTriple.getOS() == Triple::IOS; }
   bool isTargetDarwin() const { return TargetTriple.isOSDarwin(); }
+  bool isTargetLinux() const { return TargetTriple.isOSLinux(); }
   bool isTargetNaCl() const {
     return TargetTriple.getOS() == Triple::NaCl;
   }
