@@ -1300,7 +1300,11 @@ bool X86FastISel::X86SelectDivRem(const Instruction *I) {
   unsigned TypeIndex, OpIndex;
   switch (VT.SimpleTy) {
   default: return false;
-  case MVT::i8:  TypeIndex = 0; break;
+  // Don't handle the i8 case since we might end up trying
+  // to use AH in a REX instruction. Instead just punt to
+  // ISelDAGToDAG which has the logic to handle that case.
+  case MVT::i8:
+    return false;
   case MVT::i16: TypeIndex = 1; break;
   case MVT::i32: TypeIndex = 2; break;
   case MVT::i64: TypeIndex = 3;
