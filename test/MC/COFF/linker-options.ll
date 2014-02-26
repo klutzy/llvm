@@ -18,4 +18,4 @@ define dllexport void @foo() {
 ; CHECK: .ascii   " /DEFAULTLIB:msvcrt.lib"
 ; CHECK: .ascii   " /DEFAULTLIB:secur32.lib"
 ; CHECK: .ascii   " \"/with spaces\""
-; CHECK: .ascii   " /EXPORT:_foo"
+; CHECK: .ascii   " /EXPORT:foo"
