@@ -647,16 +647,20 @@ void X86AsmPrinter::EmitEndOfAsmFile(Module &M) {
     }
 
     // Necessary for dllexport support
-    std::vector<const MCSymbol*> DLLExportedFns, DLLExportedGlobals;
+    std::vector<StringRef> DLLExportedFns, DLLExportedGlobals;
 
-    for (Module::const_iterator I = M.begin(), E = M.end(); I != E; ++I)
+    for (Module::const_iterator I = M.begin(), E = M.end(); I != E; ++I) {
+      const GlobalValue *GV = I;
       if (I->hasDLLExportStorageClass())
-        DLLExportedFns.push_back(getSymbol(I));
+        DLLExportedFns.push_back(GV->getName());
+    }
 
     for (Module::const_global_iterator I = M.global_begin(),
-           E = M.global_end(); I != E; ++I)
+           E = M.global_end(); I != E; ++I) {
+      const GlobalValue *GV = I;
       if (I->hasDLLExportStorageClass())
-        DLLExportedGlobals.push_back(getSymbol(I));
+        DLLExportedGlobals.push_back(GV->getName());
+    }
 
     for (Module::const_alias_iterator I = M.alias_begin(), E = M.alias_end();
                                       I != E; ++I) {
@@ -667,10 +671,14 @@ void X86AsmPrinter::EmitEndOfAsmFile(Module &M) {
       while (const GlobalAlias *A = dyn_cast<GlobalAlias>(GV))
         GV = A->getAliasedGlobal();
 
-      if (isa<Function>(GV))
-        DLLExportedFns.push_back(getSymbol(I));
-      else if (isa<GlobalVariable>(GV))
-        DLLExportedGlobals.push_back(getSymbol(I));
+      if (isa<Function>(GV)) {
+        const GlobalValue *GV = I;
+        DLLExportedFns.push_back(GV->getName());
+      }
+      else if (isa<GlobalVariable>(GV)) {
+        const GlobalValue *GV = I;
+        DLLExportedGlobals.push_back(GV->getName());
+      }
     }
 
     // Output linker support code for dllexported globals on windows.
@@ -685,7 +693,7 @@ void X86AsmPrinter::EmitEndOfAsmFile(Module &M) {
           name = " /EXPORT:";
         else
           name = " -export:";
-        name += DLLExportedGlobals[i]->getName();
+        name += DLLExportedGlobals[i];
         if (Subtarget->isTargetWindows())
           name += ",DATA";
         else
@@ -698,7 +706,7 @@ void X86AsmPrinter::EmitEndOfAsmFile(Module &M) {
           name = " /EXPORT:";
         else
           name = " -export:";
-        name += DLLExportedFns[i]->getName();
+        name += DLLExportedFns[i];
         OutStreamer.EmitBytes(name);
       }
     }
